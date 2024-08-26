@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GreenBusters - QR Scan</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500&display=swap" rel="stylesheet">
+    <script src="./jsQR.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Roboto', sans-serif;
+            background-color: #f0f4f3;
+            color: #2c6e49;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 40px;
+            margin-bottom: 20px;
+            font-weight: 500;
+            color: #1b4332;
+        }
+
+        .button-container, #upload-section, #qr-section {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .button-container button, #upload-section button, #qr-section button {
+            padding: 15px 30px;
+            font-size: 1.2em;
+            font-weight: 500;
+            color: #fff;
+            background-color: #2c6e49;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        .button-container button:hover, #upload-section button:hover, #qr-section button:hover {
+            background-color: #1b4332;
+        }
+
+        main {
+            width: 100%;
+            height: 100%;
+            text-align: center;
+        }
+
+        div#frame {
+            border: 2px solid #005666;
+            background-color: #FFFFFF;
+            margin: 10px;
+            padding: 8px;
+        }
+
+        div#outputLayer {
+            text-align: left;
+        }
+
+        canvas {
+            width: 100%;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="main-section">
+        <h1>GreenBusters</h1>
+        <div class="button-container">
+            <button onclick="showUploadSection()">기업</button>
+            <button onclick="showQrSection()">사용자</button>
+        </div>
+    </div>
+
+    <div id="upload-section" style="display:none;">
+        <h2>파일 업로드</h2>
+        <input type="file" id="jsonFile" accept=".json">
+        <button onclick="uploadJson()">업로드</button>
+        <button onclick="goBack()">뒤로가기</button>
+    </div>
+
+    <div id="qr-section" style="display:none;">
+        <h2>QR 코드 스캔</h2>
+        <div id="frame">
+            <div id="loadingMessage">🎥 비디오 스트림에 액세스 할 수 없습니다<br/>웹캠이 활성화되어 있는지 확인하십시오</div>
+            <canvas id="canvas"></canvas>
+        </div>
+        <button onclick="goBack()">뒤로가기</button>
+        <div id="test">
+            <h1>QR 코드 스캔 결과</h1>
+            <div id="output">
+                <div id="outputMessage"></div>
+                <div id="outputLayer" hidden>
+                    <span id="outputData"></span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function showUploadSection() {
+            document.getElementById('main-section').style.display = 'none';
+            document.getElementById('upload-section').style.display = 'block';
+        }
+
+        function showQrSection() {
+            document.getElementById('main-section').style.display = 'none';
+            document.getElementById('qr-section').style.display = 'block';
+            openCamera();
+        }
+
+        function goBack() {
+            document.getElementById('upload-section').style.display = 'none';
+            document.getElementById('qr-section').style.display = 'none';
+            document.getElementById('main-section').style.display = 'block';
+        }
+
+        function uploadJson() {
+            const fileInput = document.getElementById('jsonFile');
+            const file = fileInput.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    const jsonData = event.target.result;
+                    console.log('JSON Data:', jsonData);
+                    alert("파일이 성공적으로 업로드되었습니다.");
+                };
+                reader.readAsText(file);
+            } else {
+                alert("업로드할 파일을 선택하세요.");
+            }
+        }
+
+        function openCamera() {
+            startScan();
+        }
+
+        function startScan() {
+            var video = document.createElement("video");
+            var canvasElement = document.getElementById("canvas");
+            var canvas = canvasElement.getContext("2d");
+            var loadingMessage = document.getElementById("loadingMessage");
+            var outputContainer = document.getElementById("output");
+            var outputMessage = document.getElementById("outputMessage");
+            var outputData = document.getElementById("outputData");
+
+            function drawLine(begin, end, color) {
+                canvas.beginPath();
+                canvas.moveTo(begin.x, begin.y);
+                canvas.lineTo(end.x, end.y);
+                canvas.lineWidth = 4;
+                canvas.strokeStyle = color;
+                canvas.stroke();
+            }
+
+            navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
+            .then(function(stream) {
+                video.srcObject = stream;
+                video.setAttribute("playsinline", true); // iOS 전체 화면 방지
+                video.play();
+                requestAnimationFrame(tick);
+            })
+            .catch(function(err) {
+                alert("카메라 권한이 필요합니다. 설정에서 권한을 허용해 주세요.");
+                console.error("카메라 권한 요청 오류:", err);
+            });
+
+            function tick() {
+                loadingMessage.innerText = "⌛ 스캔 기능을 활성화 중입니다.";
+
+                if (video.readyState === video.HAVE_ENOUGH_DATA) {
+                    loadingMessage.hidden = true;
+                    canvasElement.hidden = false;
+                    outputContainer.hidden = false;
+
+                    canvasElement.height = video.videoHeight;
+                    canvasElement.width = video.videoWidth;
+                    canvas.drawImage(video, 0, 0, canvasElement.width, canvasElement.height);
+
+                    var imageData = canvas.getImageData(0, 0, canvasElement.width, canvasElement.height);
+                    var code = jsQR(imageData.data, imageData.width, imageData.height, {
+                        inversionAttempts: "dontInvert",
+                    });
+
+                    if (code) {
+                        drawLine(code.location.topLeftCorner, code.location.topRightCorner, "#FF0000");
+                        drawLine(code.location.topRightCorner, code.location.bottomRightCorner, "#FF0000");
+                        drawLine(code.location.bottomRightCorner, code.location.bottomLeftCorner, "#FF0000");
+                        drawLine(code.location.bottomLeftCorner, code.location.topLeftCorner, "#FF0000");
+
+                        outputMessage.hidden = true;
+                        outputData.parentElement.hidden = false;
+
+                        outputData.innerHTML = code.data;
+
+                        return;
+                    } else {
+                        outputMessage.hidden = false;
+                        outputData.parentElement.hidden = true;
+                    }
+                }
+                requestAnimationFrame(tick);
+            }
+        }
+    </script>
+</body>
+</html>
